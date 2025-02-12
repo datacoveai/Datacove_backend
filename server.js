@@ -7,9 +7,14 @@ import cookieParser from "cookie-parser";
 const app = express();
 
 const PORT = ENV_VARS.PORT;
+
+const corsOptions = {
+  origin: "http://localhost:5173", // Allow only your local frontend to access the backend
+  credentials: true, // Allow cookies to be sent with requests
+};
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors());
+app.use(cors(corsOptions));
 
 app.use("/api/v1/auth", authRoutes);
 
