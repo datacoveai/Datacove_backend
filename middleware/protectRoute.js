@@ -6,6 +6,7 @@ import { ENV_VARS } from "../config/envVar.js";
 export const protectRoute = async (req, res, next) => {
   try {
     const token = req.cookies["datacove-ai"];
+    // console.log(token);
 
     if (!token) {
       return res.status(400).json({

@@ -24,7 +24,7 @@ export async function individualSignup(req, res) {
     if (phone.length < 10) {
       return res.status(400).json({
         success: false,
-        message: "Password must be at least 6 characters",
+        message: "Phonenumber must be at least 10 characters",
       });
     }
 

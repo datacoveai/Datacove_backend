@@ -6,8 +6,9 @@ export const generateTokenAndSetCookie = (userId, res) => {
 
   res.cookie("datacove-ai", token, {
     maxAge: 15 * 24 * 60 * 60 * 1000, //15 days in MS
-    httpOnly: true, //prevent xss attacks cross-state scripting attacks, make it not accessed by js
-    sameSite: "strict",
+    httpOnly: true, // Prevent XSS attacks, make it not accessible by JS
+    sameSite: "None", // Allow the cookie to be sent in cross-origin requests
+    secure: ENV_VARS.NODE_ENV === "production",
   });
   return token;
 };
