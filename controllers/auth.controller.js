@@ -201,8 +201,7 @@ export async function logout(req, res) {
       httpOnly: true,
       secure: true,
       sameSite: "None",
-      path: "/", // Match with cookie path
-      domain: ".netlify.app", // Matches frontend domain
+      path: "/", // Ensure path matches the original cookie
     });
     res.status(200).json({
       success: true,
