@@ -12,10 +12,12 @@ const app = express();
 const PORT = ENV_VARS.PORT;
 
 const corsOptions = {
-  // origin: "http://localhost:5173",
   origin: "https://cove-genai.netlify.app",
   credentials: true, // Allow cookies to be sent with requests
+  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 };
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors(corsOptions));
