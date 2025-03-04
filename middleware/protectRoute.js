@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { User } from "../model/user.model.js";
 import { Org } from "../model/org.model.js";
 import { ENV_VARS } from "../config/envVar.js";
+import { Client } from "../model/client.model.js";
 
 export const protectRoute = async (req, res, next) => {
   try {
@@ -26,15 +27,16 @@ export const protectRoute = async (req, res, next) => {
 
     const user = await User.findById(decoded.userId).select("-password");
     const org = await Org.findById(decoded.userId).select("-password");
+    const client = await Client.findById(decoded.userId).select("-password");
 
-    if (!user && !org) {
+    if (!user && !org && !client) {
       return res.status(404).json({
         success: false,
         message: "User not found",
       });
     }
 
-    const account = user || org;
+    const account = user || org || client;
 
     req.user = account;
     next();
