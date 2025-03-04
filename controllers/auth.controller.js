@@ -196,7 +196,14 @@ export async function OrganizationSignUp(req, res) {
 
 export async function logout(req, res) {
   try {
-    res.clearCookie("datacove-ai");
+    console.log("Logout request received, Cookies:", req.cookies);
+    res.clearCookie("datacove-ai", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+      path: "/", // Match with cookie path
+      domain: ".netlify.app", // Matches frontend domain
+    });
     res.status(200).json({
       success: true,
       message: "Logged out successfully",

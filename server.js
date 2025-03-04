@@ -6,8 +6,7 @@ import upload from "./routes/upload.route.js";
 import { ENV_VARS } from "./config/envVar.js";
 import { connectDB } from "./config/db.js";
 import cookieParser from "cookie-parser";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import multer from "multer";
+
 const app = express();
 
 const PORT = ENV_VARS.PORT;
