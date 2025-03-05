@@ -8,6 +8,8 @@ import crypto from "crypto";
 import { ENV_VARS } from "../config/envVar.js";
 import sgMail from "@sendgrid/mail";
 import { Client } from "../model/client.model.js";
+import generateOTP from "../helper/otpGenerator.js";
+import sendOTP from "../helper/sendOtp.js";
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
@@ -23,7 +25,7 @@ export async function individualSignup(req, res) {
     }
 
     const formattedName = name.toLowerCase().replace(/\s+/g, "");
-    console.log("Formatted-Name", formattedName);
+    // console.log("Formatted-Name", formattedName);
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -70,6 +72,9 @@ export async function individualSignup(req, res) {
 
     const image = PROFILE_PICS[Math.floor(Math.random() * PROFILE_PICS.length)];
 
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
     const newUser = new User({
       name: formattedName,
       displayName: name,
@@ -78,23 +83,36 @@ export async function individualSignup(req, res) {
       phoneNumber: phone,
       image,
       userType: "individual",
+      otp,
+      otpExpires,
+      is_email_verified: false,
     });
 
-    // Create an S3 bucket for the user
-    const bucketName = await createUserBucket(newUser._id, newUser.name);
-
-    // Update user with bucket info
-    newUser.s3Bucket = bucketName;
     await newUser.save();
 
-    generateTokenAndSetCookie(newUser._id, res);
+    // generateTokenAndSetCookie(newUser._id, res);
+
+    try {
+      await sendOTP(email, otp);
+    } catch (error) {
+      console.error("Failed to send OTP email:", error.message);
+      return res
+        .status(500)
+        .json({ success: false, message: "OTP could not be sent." });
+    }
+
+    // Create an S3 bucket for the user
+    // const bucketName = await createUserBucket(newUser._id, newUser.name);
+
+    // // Update user with bucket info
+    // newUser.s3Bucket = bucketName;
 
     res.status(201).json({
       success: true,
       user: {
         ...newUser._doc,
         password: "",
-        s3Bucket: bucketName,
+        // s3Bucket: bucketName,
       },
     });
   } catch (error) {
@@ -238,6 +256,14 @@ export async function login(req, res) {
     const account = user || org || client; // Pick whichever exists
     // console.log("ACC", account);
 
+    // Check if email is verified
+    // if (!account.is_email_verified) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Email not verified. Please verify your email.",
+    //   });
+    // }
+
     const isPasswordCorrect = await bcryptjs.compare(
       password,
       account.password
@@ -360,6 +386,114 @@ export const resetPassword = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error." });
   }
 };
+
+export async function verifyOTP(req, res) {
+  try {
+    const { email, otp } = req.body;
+    // console.log("email ", email);
+    // console.log("otp", otp);
+
+    if (!email || !otp) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email and OTP are required" });
+    }
+
+    const user = await User.findOne({ email });
+    const org = await Org.findOne({ email });
+
+    if (!user && !org) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Invalid credentials" });
+    }
+
+    const acc = user || org;
+    // console.log("Acc from OTP ", acc);
+
+    if (acc.is_email_verified === true) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email already verified" });
+    }
+
+    if (acc.otp !== otp) {
+      return res.status(400).json({ success: false, message: "Invalid otp" });
+    }
+    if (acc.otpExpires < new Date()) {
+      return res.status(400).json({ success: false, message: " expired OTP" });
+    }
+
+    // Update user verification status
+    acc.is_email_verified = true;
+    acc.otp = null;
+    acc.otpExpires = null;
+
+    // Create an S3 bucket for the user
+    const bucketName = await createUserBucket(acc._id, acc.name);
+
+    // Update user with bucket info
+    acc.s3Bucket = bucketName;
+
+    await acc.save();
+
+    res.status(200).json({
+      success: true,
+      user: {
+        ...acc._doc,
+        password: "",
+        s3Bucket: bucketName,
+      },
+      message: "Email verified successfully. You can now log in.",
+    });
+  } catch (error) {
+    console.error("Error in OTP verification:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+}
+
+export async function resendOTP(req, res) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email });
+    const org = await Org.findOne({ email });
+
+    if (!user && !org) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User not found" });
+    }
+
+    const acc = user || org;
+
+    if (acc.is_email_verified) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is already verified" });
+    }
+
+    const newOTP = generateOTP();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    acc.otp = newOTP;
+    acc.otpExpires = otpExpires;
+    await acc.save();
+
+    await sendOTP(email, newOTP);
+
+    res.status(200).json({ success: true, message: "New OTP sent to email" });
+  } catch (error) {
+    console.error("Error in resending OTP:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+}
 
 export async function authCheck(req, res) {
   try {

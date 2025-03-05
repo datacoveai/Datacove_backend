@@ -31,6 +31,11 @@ const userSchema = mongoose.Schema(
       type: String,
       default: null, // Stores the S3 bucket name
     },
+
+    is_email_verified: { type: Boolean, default: false },
+    otp: { type: String },
+    otpExpires: { type: Date },
+
     notes: [
       {
         title: String,

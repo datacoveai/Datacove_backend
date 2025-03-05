@@ -216,6 +216,7 @@ export async function acceptInvitation(req, res) {
       inviterId: inviter._id,
       folder: clientFolderPath,
       userS3Bucket: inviter.s3Bucket,
+      is_email_verified: true,
     });
 
     // Update the invitation as accepted
