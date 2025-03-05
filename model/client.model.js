@@ -34,6 +34,7 @@ const clientSchema = mongoose.Schema(
       type: String,
       required: true,
     },
+    is_email_verified: { type: Boolean, default: false },
     notes: [
       {
         title: String,
