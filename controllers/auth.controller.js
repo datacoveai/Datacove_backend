@@ -251,12 +251,12 @@ export async function login(req, res) {
     // console.log("ACC", account);
 
     // Check if email is verified
-    // if (!account.is_email_verified) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Email not verified. Please verify your email.",
-    //   });
-    // }
+    if (!account.is_email_verified) {
+      return res.status(400).json({
+        success: false,
+        message: "Email not verified. Please verify your email.",
+      });
+    }
 
     const isPasswordCorrect = await bcryptjs.compare(
       password,
@@ -405,7 +405,7 @@ export async function verifyOTP(req, res) {
     const acc = user || org;
     // console.log("Acc from OTP ", acc);
 
-    if (acc.is_email_verified === true) {
+    if (acc.is_email_verified) {
       return res
         .status(400)
         .json({ success: false, message: "Email already verified" });

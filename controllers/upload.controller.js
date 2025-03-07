@@ -56,7 +56,9 @@ export async function uploadFile(req, res) {
       // const fileUrl = `https://${userBucketName}.s3.${userBucketRegion}.amazonaws.com/${fileName}`;
       const fileUrl = `https://${userBucketName}.s3.amazonaws.com/${fileName}`;
 
-      console.log("LINK", fileUrl);
+      // console.log("result from upload", result);
+
+      // console.log("LINK", fileUrl);
       fileUrls.push(fileUrl);
     }
 
@@ -160,5 +162,47 @@ export async function uploadClientFile(req, res) {
   } catch (error) {
     console.error("Client Upload Error:", error);
     res.status(500).json({ success: false, message: "Upload failed" });
+  }
+}
+
+export async function shareFile(req, res) {
+  const { docId, clientEmail, fileName, fileUrl } = req.body;
+  console.log("doc id : ", docId);
+  console.log("Client email: ", clientEmail);
+
+  try {
+    const user = req.user;
+
+    // console.log("user from share", user);
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Find the client by email
+    const client = await Client.findOne({ email: clientEmail });
+    if (!client) return res.status(404).json({ message: "Client not found" });
+
+    // Update the user's sharedDocs
+    user.sharedDocs.push({
+      docId,
+      clientId: clientEmail,
+      docUrl: fileUrl,
+      docName: fileName,
+    });
+    await user.save();
+
+    // Update the client's sharedDocs
+    client.sharedDocs.push({
+      docId,
+      sharedBy: user.email,
+      sharedByName: user.displayName,
+      fileUrl: fileUrl,
+      fileName: fileName,
+    });
+    await client.save();
+
+    res.status(200).json({ message: "Document shared successfully" });
+  } catch (error) {
+    console.error("Error in file share:", error);
+    res.status(500).json({ success: false, message: "Cannot share" });
   }
 }
