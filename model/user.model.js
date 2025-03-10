@@ -1,4 +1,5 @@
 import mongoose, { mongo } from "mongoose";
+import { Membership } from "./membership.model.js";
 
 const userSchema = mongoose.Schema(
   {
@@ -73,6 +74,7 @@ const userSchema = mongoose.Schema(
           unique: true,
         },
         invitedAt: { type: Date, default: Date.now },
+        expiresAt: { type: Date },
       },
     ],
     clients: [
@@ -84,6 +86,8 @@ const userSchema = mongoose.Schema(
         userS3Bucket: { type: String, required: true },
       },
     ],
+
+    membership: { type: mongoose.Schema.Types.ObjectId, ref: "Membership" },
 
     // folders: [
     //   {

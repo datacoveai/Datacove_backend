@@ -45,6 +45,15 @@ const orgSchema = mongoose.Schema(
       },
     ],
     docs: [],
+    sharedDocs: [
+      {
+        docId: { type: String, ref: "Document" },
+        clientId: { type: String, ref: "Client" },
+        docName: { type: String, required: true },
+        docUrl: { type: String, required: true },
+        sharedAt: { type: Date, default: Date.now },
+      },
+    ],
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
 

@@ -9,6 +9,127 @@ import { uploadEmptyObject } from "../../s3.js";
 import mongoose from "mongoose";
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
+// export async function inviteClients(req, res) {
+//   try {
+//     const { email, userId } = req.body;
+//     console.log("Email from invite", email);
+//     console.log("userId from invite", userId);
+
+//     // Check if the client already exists as a User or in Clients collection
+//     const existingUser = await User.findOne({ email });
+//     const existingClient = await Clients.findOne({ email });
+
+//     if (existingUser || existingClient) {
+//       // If the client is already registered, send them a login link instead
+//       const loginLink = `${ENV_VARS.FRONTEND_URL}`;
+
+//       const msg = {
+//         to: email,
+//         from: ENV_VARS.SENDGRID_EMAIL,
+//         subject: "Welcome back! Log in to your account",
+//         text: `You are already registered. Click here to log in: ${loginLink}`,
+//         html: `
+//           <div>
+//             <h2>Welcome back!</h2>
+//             <p>You already have an account with us.</p>
+//             <p>Click the link below to log in:</p>
+//             <a href="${loginLink}">Log in to your account</a>
+//           </div>
+//         `,
+//       };
+
+//       await sgMail.send(msg);
+//       return res
+//         .status(200)
+//         .json({
+//           success: true,
+//           message: "User already exists, sent login link.",
+//         });
+//     }
+
+//     // Generate a unique invitation token
+//     const invitationToken = crypto.randomBytes(20).toString("hex");
+
+//     // Set expiration date (72 hours from now)
+//     const expirationDate = new Date();
+//     expirationDate.setHours(expirationDate.getHours() + 72);
+
+//     // Create invitation link
+//     const invitationLink = `${ENV_VARS.FRONTEND_URL}/join?token=${invitationToken}`;
+
+//     const acc = (await User.findById(userId)) || (await Org.findById(userId));
+
+//     if (!acc) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Account not found" });
+//     }
+
+//     // Check if client is already in the clients list
+//     const alreadyClient = acc.clients.some((client) => client.email === email);
+
+//     if (alreadyClient) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "This user is already your client." });
+//     }
+
+//     // Check if client is already invited
+//     const existingInvitationIndex = acc.invitations.findIndex(
+//       (invite) => invite.inviteeEmail === email
+//     );
+
+//     if (existingInvitationIndex !== -1) {
+//       // Update existing invitation with new token and reset expiration
+//       acc.invitations[existingInvitationIndex].token = invitationToken;
+//       acc.invitations[existingInvitationIndex].expiresAt = expirationDate;
+//       acc.invitations[existingInvitationIndex].status = "pending";
+//       // Optional: You may want to track that this is a re-invitation
+//       acc.invitations[existingInvitationIndex].updatedAt = new Date();
+//     } else {
+//       // Create new invitation
+//       acc.invitations.push({
+//         inviteeEmail: email,
+//         token: invitationToken,
+//         status: "pending",
+//         clientId: `${email}-${Date.now()}`,
+//         expiresAt: expirationDate,
+//         createdAt: new Date(),
+//       });
+//     }
+
+//     await acc.save();
+
+//     const msg = {
+//       to: email,
+//       from: ENV_VARS.SENDGRID_EMAIL,
+//       subject: "Join our document sharing platform!",
+//       text: `${acc.name} invited you to join. Click here: ${invitationLink} (This invitation expires in 72 hours)`,
+//       html: `
+//         <div>
+//           <h2>You've been invited!</h2>
+//           <p><strong>${acc.name}</strong> has invited you.</p>
+//           <p>Click the link below to create your account:</p>
+//           <a href="${invitationLink}">Accept Invitation</a>
+//           <p><em>This invitation expires in 72 hours.</em></p>
+//         </div>
+//       `,
+//     };
+
+//     // Send email using SendGrid
+//     await sgMail.send(msg);
+//     res
+//       .status(200)
+//       .json({ success: true, message: "Invitation sent successfully" });
+//   } catch (error) {
+//     console.log("Error in inviting client", error.message);
+//     res.status(500).json({
+//       success: false,
+//       message: "Internal server error in inviting client",
+//     });
+//   }
+// }
+
 export async function inviteClients(req, res) {
   try {
     const { email, userId } = req.body;
@@ -22,10 +143,10 @@ export async function inviteClients(req, res) {
     const expirationDate = new Date();
     expirationDate.setHours(expirationDate.getHours() + 72);
 
-    // Create invitation link
-    const invitationLink = `${ENV_VARS.FRONTEND_URL}/join?token=${invitationToken}`;
-
+    // Check if the client already exists as a User
+    const existingUser = await User.findOne({ email });
     const acc = (await User.findById(userId)) || (await Org.findById(userId));
+    console.log("Acc from invitation", acc.invitations);
 
     if (!acc) {
       return res
@@ -33,27 +154,30 @@ export async function inviteClients(req, res) {
         .json({ success: false, message: "Account not found" });
     }
 
-    // Check if client is already in the clients list
-    const alreadyClient = acc.clients.some((client) => client.email === email);
-
-    if (alreadyClient) {
-      return res
-        .status(400)
-        .json({ success: false, message: "This user is already your client." });
+    // Check if the user is already in the clients list
+    if (acc.clients.some((client) => client.email === email)) {
+      return res.status(400).json({
+        success: false,
+        message: "This user is already your client.",
+      });
     }
 
-    // Check if client is already invited
-    const existingInvitationIndex = acc.invitations.findIndex(
-      (invite) => invite.inviteeEmail === email
+    // Check if the client is already invited within 72 hours
+    const existingInvitation = acc.invitations.find(
+      (invite) =>
+        invite.inviteeEmail === email &&
+        invite.status === "pending" &&
+        invite.expiresAt &&
+        new Date(invite.expiresAt) > new Date()
     );
 
-    if (existingInvitationIndex !== -1) {
-      // Update existing invitation with new token and reset expiration
-      acc.invitations[existingInvitationIndex].token = invitationToken;
-      acc.invitations[existingInvitationIndex].expiresAt = expirationDate;
-      acc.invitations[existingInvitationIndex].status = "pending";
-      // Optional: You may want to track that this is a re-invitation
-      acc.invitations[existingInvitationIndex].updatedAt = new Date();
+    console.log("existing Invitation", existingInvitation);
+
+    if (existingInvitation) {
+      // Update existing invitation
+      existingInvitation.token = invitationToken;
+      existingInvitation.expiresAt = expirationDate;
+      existingInvitation.updatedAt = new Date();
     } else {
       // Create new invitation
       acc.invitations.push({
@@ -61,6 +185,7 @@ export async function inviteClients(req, res) {
         token: invitationToken,
         status: "pending",
         clientId: `${email}-${Date.now()}`,
+        invitedAt: new Date(),
         expiresAt: expirationDate,
         createdAt: new Date(),
       });
@@ -68,23 +193,41 @@ export async function inviteClients(req, res) {
 
     await acc.save();
 
+    // Encode the name of the inviter
+    const encodedInviterName = encodeURIComponent(acc.name);
+
+    // Create invitation link
+    const invitationLink = existingUser
+      ? `${ENV_VARS.FRONTEND_URL}/accept-invitation?token=${invitationToken}&inviterName=${encodedInviterName}`
+      : `${ENV_VARS.FRONTEND_URL}/join?token=${invitationToken}`;
+
+    // Send email notification
     const msg = {
       to: email,
       from: ENV_VARS.SENDGRID_EMAIL,
-      subject: "Join our document sharing platform!",
-      text: `${acc.name} invited you to join. Click here: ${invitationLink} (This invitation expires in 72 hours)`,
+      subject: existingUser
+        ? "You've been invited as a client!"
+        : "Join our document sharing platform!",
+      text: existingUser
+        ? `${acc.name} invited you to be their client. Click here: ${invitationLink} (This invitation expires in 72 hours)`
+        : `${acc.name} invited you to join. Click here: ${invitationLink} (This invitation expires in 72 hours)`,
       html: `
         <div>
           <h2>You've been invited!</h2>
-          <p><strong>${acc.name}</strong> has invited you.</p>
-          <p>Click the link below to create your account:</p>
-          <a href="${invitationLink}">Accept Invitation</a>
+          <p><strong>${acc.name}</strong> has invited you ${
+        existingUser ? "to be their client" : "to join"
+      }.</p>
+          <p>Click the link below to ${
+            existingUser ? "accept the invitation" : "create your account"
+          }:</p>
+          <a href="${invitationLink}">${
+        existingUser ? "Accept Invitation" : "Join"
+      }</a>
           <p><em>This invitation expires in 72 hours.</em></p>
         </div>
       `,
     };
 
-    // Send email using SendGrid
     await sgMail.send(msg);
     res
       .status(200)
@@ -97,7 +240,6 @@ export async function inviteClients(req, res) {
     });
   }
 }
-
 export async function getInvitation(req, res) {
   try {
     const { token } = req.query;
@@ -234,6 +376,75 @@ export async function acceptInvitation(req, res) {
 
     await inviter.save();
     await newUser.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Invitation accepted successfully!",
+    });
+  } catch (error) {
+    console.log("Error accepting invitation:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+}
+
+export async function acceptClientInvitation(req, res) {
+  try {
+    const { token, email } = req.body;
+
+    // Find the invitation using the token
+    const userInviter = await User.findOne({ "invitations.token": token });
+    const orgInviter = await Org.findOne({ "invitations.token": token });
+
+    if (!userInviter && !orgInviter) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Invalid or expired invitation." });
+    }
+
+    const inviter = userInviter || orgInviter;
+
+    // Find the specific invitation
+    const invitation = inviter.invitations.find((inv) => inv.token === token);
+
+    if (!invitation || invitation.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "This invitation has already been used.",
+      });
+    }
+
+    if (invitation.inviteeEmail !== email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email does not match the invitation.",
+      });
+    }
+
+    // Check if the user exists
+    const existingUser = await User.findOne({ email });
+
+    if (!existingUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
+    }
+
+    // Update the invitation as accepted
+    invitation.status = "accepted";
+    invitation.clientId = existingUser._id;
+
+    // Add the invitee to the inviter's clients list
+    inviter.clients.push({
+      inviterId: inviter._id,
+      name: existingUser.name,
+      email: existingUser.email,
+      folder: existingUser.s3Bucket
+        ? `clients/${existingUser.name}-${existingUser._id}`
+        : "",
+      userS3Bucket: existingUser.s3Bucket || "",
+    });
+
+    await inviter.save();
 
     res.status(200).json({
       success: true,

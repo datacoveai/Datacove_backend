@@ -190,10 +190,10 @@ export async function OrganizationSignUp(req, res) {
     });
 
     // Create an S3 bucket for the user
-    const bucketName = await createUserBucket(orgUser._id, orgUser.name);
+    // const bucketName = await createUserBucket(orgUser._id, orgUser.name);
 
-    // Update user with bucket info
-    orgUser.s3Bucket = bucketName;
+    // // Update user with bucket info
+    // orgUser.s3Bucket = bucketName;
     await orgUser.save();
 
     generateTokenAndSetCookie(orgUser._id, res);
